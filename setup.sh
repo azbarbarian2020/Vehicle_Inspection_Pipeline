@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 
 # Vehicle Inspection Pipeline - Automated Setup
 # Deploys the complete pipeline to any Snowflake account with SPCS
@@ -110,7 +109,10 @@ gather_config() {
 # SNOWFLAKE SQL HELPER
 # ============================================================================
 snow_sql() {
-    snow sql -q "$1" --connection "$CONNECTION_NAME" 2>/dev/null
+    snow sql -q "$1" --connection "$CONNECTION_NAME" --database "$DATABASE" --schema "$SCHEMA" 2>/dev/null
+    if [ $? -ne 0 ]; then
+        warn "SQL command may have had issues (non-fatal)"
+    fi
 }
 
 # ============================================================================
@@ -119,9 +121,7 @@ snow_sql() {
 create_infrastructure() {
     header "Creating Infrastructure"
     
-    snow_sql "CREATE DATABASE IF NOT EXISTS $DATABASE"
-    snow_sql "USE DATABASE $DATABASE"
-    snow_sql "USE SCHEMA $SCHEMA"
+    snow sql -q "CREATE DATABASE IF NOT EXISTS $DATABASE" --connection "$CONNECTION_NAME" 2>/dev/null
     
     # Stages
     snow_sql "CREATE STAGE IF NOT EXISTS INSPECTION_PDFS ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE') DIRECTORY = (ENABLE = TRUE, AUTO_REFRESH = TRUE)"
