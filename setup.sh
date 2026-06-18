@@ -51,12 +51,11 @@ setup_connection() {
     header "Setting Up Connection"
     
     # List available connections
-    CONNECTIONS=$(snow connection list 2>/dev/null | grep -E "^\|" | grep -v "key" | awk -F'|' '{print $2}' | tr -d ' ' | grep -v '^$')
+    echo "Available connections:"
+    snow connection list 2>/dev/null | grep -E "^\|" | awk -F'|' '{print $2}' | tr -d ' ' | grep -v "^$" | grep -v "connection_name" | grep -v "^-" | nl
+    echo ""
     
     if [ -z "$CONNECTION_NAME" ]; then
-        echo "Available connections:"
-        echo "$CONNECTIONS" | nl
-        echo ""
         read -p "Enter connection name to use: " CONNECTION_NAME
     fi
     
@@ -72,10 +71,10 @@ setup_connection() {
     # Get registry URL
     REGISTRY_URL=$(snow sql -q "SHOW IMAGE REPOSITORIES IN ACCOUNT" --connection "$CONNECTION_NAME" 2>/dev/null | head -1 | awk -F'|' '{print $6}' | tr -d ' ' | sed 's|/.*||')
     if [ -z "$REGISTRY_URL" ]; then
-        REGISTRY_URL="${ORG_ACCOUNT,,}.registry.snowflakecomputing.com"
+        REGISTRY_URL="$(echo "$ORG_ACCOUNT" | tr '[:upper:]' '[:lower:]').registry.snowflakecomputing.com"
     fi
     
-    HOST="${ORG_ACCOUNT,,}.snowflakecomputing.com"
+    HOST="$(echo "$ORG_ACCOUNT" | tr '[:upper:]' '[:lower:]').snowflakecomputing.com"
     
     log "Account: $ORG_ACCOUNT (locator: $ACCOUNT)"
     log "User: $USER"
