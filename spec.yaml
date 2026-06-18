@@ -1,0 +1,25 @@
+spec:
+  containers:
+    - name: inspection-service
+      image: /vehicle_inspections/public/inspection_repo/inspection-pipeline:latest
+      env:
+        SNOWFLAKE_ACCOUNT: SFSENORTHAMERICA-JDREW
+        SNOWFLAKE_USER: admin
+        SNOWFLAKE_WAREHOUSE: COMPUTE_WH
+      secrets:
+        - snowflakeSecret: VEHICLE_INSPECTIONS.PUBLIC.SNOWFLAKE_PRIVATE_KEY_SECRET
+          secretKeyRef: secret_string
+          envVarName: SNOWFLAKE_PRIVATE_KEY
+      resources:
+        requests:
+          cpu: 0.5
+          memory: 1Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+  endpoints:
+    - name: app
+      port: 8080
+      public: true
+  networkPolicyConfig:
+    allowInternetEgress: true

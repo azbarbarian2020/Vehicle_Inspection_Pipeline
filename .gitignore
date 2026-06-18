@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+node_modules/
+dist/
+.next/
+*.egg-info/
+.DS_Store
+/tmp/
+/frontend/node_modules/
+/frontend/dist/
+.snowflake/
