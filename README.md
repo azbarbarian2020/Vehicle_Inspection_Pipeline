@@ -49,11 +49,12 @@ Email to jason.drew@snowflake.com
 | FAILED_LINE_ITEMS | Table | Only items with P/F = F |
 | FAILURE_IMAGES | Table | Image metadata + stage paths |
 | PROCESSING_QUEUE | Table | Tracks files pending/processed |
+| PIPELINE_SETTINGS | Table | Configurable settings (email recipients, etc.) |
 | PDF_STREAM | Stream | On directory table, detects new files |
 | QUEUE_NEW_PDFS | Task | Consumes stream into queue (1-min) |
 | INSPECTION_SERVICE | Service | SPCS container (FastAPI + PyMuPDF + React) |
 | INSPECTION_POOL | Compute Pool | CPU_X64_XS, auto-suspend 5min |
-| INSPECTION_EMAIL_INT | Integration | Email notification to jason.drew@snowflake.com |
+| INSPECTION_EMAIL_INT | Integration | Email notification (configured recipients) |
 | INSPECTION_EXTERNAL_ACCESS | Integration | Allows SPCS to reach Snowflake API + S3 |
 
 ### SPCS Service
@@ -146,6 +147,39 @@ INSERT INTO PROCESSING_QUEUE (FILE_PATH) VALUES ('Report (X).pdf');
 ```sql
 CALL VEHICLE_INSPECTIONS.PUBLIC.GENERATE_INSPECTION_EMAIL();
 ```
+
+### Configuring Email Recipients
+
+Email recipients are stored in the `PIPELINE_SETTINGS` table and can be managed via the dashboard or SQL.
+
+**Via Dashboard:**
+1. Go to the dashboard URL
+2. Click **Settings** (top-right)
+3. Edit the email recipients field (comma-separated for multiple)
+4. Click **Save Settings**
+
+**Via SQL:**
+```sql
+UPDATE VEHICLE_INSPECTIONS.PUBLIC.PIPELINE_SETTINGS 
+SET SETTING_VALUE = 'user1@company.com, user2@company.com'
+WHERE SETTING_KEY = 'email_recipients';
+```
+
+**Adding a new recipient requires TWO steps:**
+
+1. Update the settings (dashboard or SQL above)
+2. Add the address to the notification integration's allowed list:
+```sql
+ALTER NOTIFICATION INTEGRATION INSPECTION_EMAIL_INT 
+SET ALLOWED_RECIPIENTS = ('user1@company.com', 'user2@company.com');
+```
+
+**Important email behavior:**
+- All recipients must be verified Snowflake users in the same account (verify email in Snowsight under user profile)
+- If ANY address in the recipient list is not in `ALLOWED_RECIPIENTS` or not verified, **NO email is sent to anyone** — it's all-or-nothing
+- Always verify a new address works before adding it to production by testing with just that address first
+- Emails are sent from `no-reply@snowflake.net` (AWS accounts)
+- Presigned image URLs in emails expire after 7 days — use the dashboard for persistent access
 
 ## Technical Details
 

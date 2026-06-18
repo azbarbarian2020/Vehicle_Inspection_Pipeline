@@ -44,8 +44,8 @@ def extract_image_assignments(doc, pic_start_page):
                     for span in line['spans']:
                         text += span['text']
                 text = text.strip()
-                # Match line number + pass code (e.g. "1.08F" or "3.12F")
-                m = re.match(r'^(\d+\.\d+\w*)([FPN])', text)
+                # Match line number + pass code (e.g. "1.08F" or "3.12Fdamaged...")
+                m = re.match(r'^(\d+\.\d+)([FPN])', text)
                 if m:
                     all_entries.append(('LINE', m.group(1), m.group(2)))
             elif b['type'] == 1:  # image block
