@@ -22,7 +22,7 @@ header() { echo -e "\n${BLUE}=== $1 ===${NC}\n"; }
 # ============================================================================
 DATABASE="VEHICLE_INSPECTIONS"
 SCHEMA="PUBLIC"
-WAREHOUSE="COMPUTE_WH"
+WAREHOUSE="INSPECTION_WH"
 COMPUTE_POOL="INSPECTION_POOL"
 SERVICE_NAME="INSPECTION_SERVICE"
 IMAGE_NAME="inspection-pipeline"
@@ -135,6 +135,9 @@ create_infrastructure() {
     header "Creating Infrastructure"
     
     snow sql -q "CREATE DATABASE IF NOT EXISTS $DATABASE" --connection "$CONNECTION_NAME" 2>/dev/null
+    
+    # Dedicated warehouse for the pipeline (Small, auto-suspend 60s)
+    snow_sql "CREATE WAREHOUSE IF NOT EXISTS $WAREHOUSE WAREHOUSE_SIZE = 'SMALL' AUTO_SUSPEND = 60 AUTO_RESUME = TRUE INITIALLY_SUSPENDED = TRUE"
     
     # Stages
     snow_sql "CREATE STAGE IF NOT EXISTS INSPECTION_PDFS ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE') DIRECTORY = (ENABLE = TRUE, AUTO_REFRESH = TRUE)"
