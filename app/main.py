@@ -449,3 +449,34 @@ def get_stats():
     cur.close()
     conn.close()
     return stats
+
+
+@app.get("/api/settings")
+def get_settings():
+    """Get pipeline settings."""
+    conn = get_connection()
+    cur = conn.cursor(snowflake.connector.DictCursor)
+    cur.execute("SELECT SETTING_KEY, SETTING_VALUE FROM PIPELINE_SETTINGS")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {row["SETTING_KEY"]: row["SETTING_VALUE"] for row in rows}
+
+
+@app.post("/api/settings")
+def update_settings(settings: dict):
+    """Update pipeline settings."""
+    conn = get_connection()
+    cur = conn.cursor()
+    for key, value in settings.items():
+        cur.execute(
+            """MERGE INTO PIPELINE_SETTINGS t USING (SELECT %s as k, %s as v) s
+               ON t.SETTING_KEY = s.k
+               WHEN MATCHED THEN UPDATE SET SETTING_VALUE = s.v, UPDATED_AT = CURRENT_TIMESTAMP()
+               WHEN NOT MATCHED THEN INSERT (SETTING_KEY, SETTING_VALUE) VALUES (s.k, s.v)""",
+            (key, value),
+        )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"status": "updated"}
