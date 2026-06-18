@@ -2,6 +2,32 @@
 
 Automated pipeline that extracts data and images from Vector Fleet Management vehicle inspection PDFs, loads them into Snowflake, sends formatted email alerts, and provides a web dashboard for browsing results.
 
+## Quick Start
+
+### Prerequisites
+- [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) (`snow`) configured with a connection
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- OpenSSL (for key-pair auth)
+- A Snowflake account with ACCOUNTADMIN access
+
+### Deploy
+
+```bash
+git clone https://github.com/azbarbarian2020/Vehicle_Inspection_Pipeline.git
+cd Vehicle_Inspection_Pipeline
+./setup.sh
+```
+
+The setup script will:
+1. Test your Snowflake CLI connection
+2. Prompt for configuration (database name, warehouse, email recipient)
+3. Create all Snowflake objects (database, tables, stages, tasks, integrations)
+4. Set up key-pair authentication (safely reuses existing keys if found)
+5. Build and push the Docker image to Snowflake's container registry
+6. Deploy the SPCS service and provide the dashboard URL
+
+After setup completes, simply upload PDFs to the stage and everything runs automatically.
+
 ## Architecture
 
 ```
