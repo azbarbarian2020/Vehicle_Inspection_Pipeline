@@ -62,13 +62,26 @@ setup_connection() {
     snow connection test --connection "$CONNECTION_NAME" >/dev/null 2>&1 || error "Connection '$CONNECTION_NAME' failed. Check your connections.toml"
     log "Connection '$CONNECTION_NAME' verified"
     
-    # Extract account info
-    ACCOUNT=$(snow sql -q "SELECT CURRENT_ACCOUNT()" --connection "$CONNECTION_NAME" 2>/dev/null | grep -v "^[+|-]" | grep -v "CURRENT_ACCOUNT" | tr -d '| \n')
-    USER=$(snow sql -q "SELECT CURRENT_USER()" --connection "$CONNECTION_NAME" 2>/dev/null | grep -v "^[+|-]" | grep -v "CURRENT_USER" | tr -d '| \n')
-    ORG_ACCOUNT=$(snow sql -q "SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME()" --connection "$CONNECTION_NAME" 2>/dev/null | grep -v "^[+|-]" | grep -v "CURRENT_ORG" | tr -d '| \n')
+    # Extract account info using JSON output for reliable parsing
+    ACCOUNT=$(snow sql -q "SELECT CURRENT_ACCOUNT() as val" --connection "$CONNECTION_NAME" --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['VAL'])" 2>/dev/null)
+    SF_USER=$(snow sql -q "SELECT CURRENT_USER() as val" --connection "$CONNECTION_NAME" --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['VAL'])" 2>/dev/null)
+    ORG_ACCOUNT=$(snow sql -q "SELECT CURRENT_ORGANIZATION_NAME() || '-' || CURRENT_ACCOUNT_NAME() as val" --connection "$CONNECTION_NAME" --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['VAL'])" 2>/dev/null)
     
-    # Get registry URL
-    REGISTRY_URL=$(snow sql -q "SHOW IMAGE REPOSITORIES IN ACCOUNT" --connection "$CONNECTION_NAME" 2>/dev/null | head -1 | awk -F'|' '{print $6}' | tr -d ' ' | sed 's|/.*||')
+    # Get registry URL from existing repo or construct from org-account
+    REGISTRY_URL=$(snow sql -q "SHOW IMAGE REPOSITORIES IN ACCOUNT" --connection "$CONNECTION_NAME" --format json 2>/dev/null | python3 -c "
+import sys,json
+try:
+    repos = json.load(sys.stdin)
+    if repos:
+        url = repos[0].get('repository_url','')
+        # Extract host from full URL (e.g. org-acct.registry.snowflakecomputing.com/db/schema/repo)
+        print(url.split('/')[0])
+    else:
+        print('')
+except:
+    print('')
+" 2>/dev/null)
+    
     if [ -z "$REGISTRY_URL" ]; then
         REGISTRY_URL="$(echo "$ORG_ACCOUNT" | tr '[:upper:]' '[:lower:]').registry.snowflakecomputing.com"
     fi
@@ -76,7 +89,7 @@ setup_connection() {
     HOST="$(echo "$ORG_ACCOUNT" | tr '[:upper:]' '[:lower:]').snowflakecomputing.com"
     
     log "Account: $ORG_ACCOUNT (locator: $ACCOUNT)"
-    log "User: $USER"
+    log "User: $SF_USER"
     log "Host: $HOST"
     log "Registry: $REGISTRY_URL"
 }
@@ -87,8 +100,8 @@ setup_connection() {
 gather_config() {
     header "Configuration"
     
-    read -p "Email recipient for alerts [$USER@snowflake.com]: " EMAIL_RECIPIENT
-    EMAIL_RECIPIENT=${EMAIL_RECIPIENT:-"$USER@snowflake.com"}
+    read -p "Email recipient for alerts [$SF_USER@snowflake.com]: " EMAIL_RECIPIENT
+    EMAIL_RECIPIENT=${EMAIL_RECIPIENT:-"$SF_USER@snowflake.com"}
     
     read -p "Database name [$DATABASE]: " input
     DATABASE=${input:-$DATABASE}
@@ -210,10 +223,10 @@ create_secrets() {
     PRIVATE_KEY_PATH=""
     
     # Check if user already has RSA_PUBLIC_KEY set
-    EXISTING_KEY=$(snow_sql "DESCRIBE USER $USER" 2>/dev/null | grep -i "RSA_PUBLIC_KEY " | grep -v "RSA_PUBLIC_KEY_2" | awk -F'|' '{print $3}' | tr -d ' ')
+    EXISTING_KEY=$(snow_sql "DESCRIBE USER $SF_USER" 2>/dev/null | grep -i "RSA_PUBLIC_KEY " | grep -v "RSA_PUBLIC_KEY_2" | awk -F'|' '{print $3}' | tr -d ' ')
     
     if [ -n "$EXISTING_KEY" ] && [ "$EXISTING_KEY" != "null" ] && [ ${#EXISTING_KEY} -gt 10 ]; then
-        log "Existing RSA_PUBLIC_KEY detected for user $USER"
+        log "Existing RSA_PUBLIC_KEY detected for user $SF_USER"
         log "Looking for matching private key..."
         
         # Try to find existing private key from connections.toml
@@ -306,7 +319,7 @@ generate_new_key() {
     openssl rsa -in "$PRIVATE_KEY_PATH" -pubout -out "$TEMP_DIR/snowflake_key.pub" 2>/dev/null
     
     PUBLIC_KEY=$(grep -v "BEGIN\|END" "$TEMP_DIR/snowflake_key.pub" | tr -d '\n')
-    snow_sql "ALTER USER $USER SET RSA_PUBLIC_KEY='$PUBLIC_KEY'"
+    snow_sql "ALTER USER $SF_USER SET RSA_PUBLIC_KEY='$PUBLIC_KEY'"
     
     # Copy to persistent location
     mkdir -p ~/.snowflake/keys
@@ -325,7 +338,7 @@ generate_key_slot_2() {
     openssl rsa -in "$PRIVATE_KEY_PATH" -pubout -out "$TEMP_DIR/snowflake_key2.pub" 2>/dev/null
     
     PUBLIC_KEY=$(grep -v "BEGIN\|END" "$TEMP_DIR/snowflake_key2.pub" | tr -d '\n')
-    snow_sql "ALTER USER $USER SET RSA_PUBLIC_KEY_2='$PUBLIC_KEY'"
+    snow_sql "ALTER USER $SF_USER SET RSA_PUBLIC_KEY_2='$PUBLIC_KEY'"
     
     # Copy to persistent location
     mkdir -p ~/.snowflake/keys
@@ -404,7 +417,7 @@ spec:
       image: $FULL_IMAGE
       env:
         SNOWFLAKE_ACCOUNT: $ORG_ACCOUNT
-        SNOWFLAKE_USER: $USER
+        SNOWFLAKE_USER: $SF_USER
         SNOWFLAKE_WAREHOUSE: $WAREHOUSE
       secrets:
         - snowflakeSecret: $DATABASE.$SCHEMA.SNOWFLAKE_PRIVATE_KEY_SECRET
