@@ -5,18 +5,27 @@ Automated pipeline that extracts data and images from Vector Fleet Management ve
 ## Quick Start
 
 ### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Mac or Windows)
 - [Snowflake CLI](https://docs.snowflake.com/en/developer-guide/snowflake-cli) (`snow`) configured with a connection
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- OpenSSL (for key-pair auth)
 - A Snowflake account with ACCOUNTADMIN access
 
 ### Deploy
+
+**Option 1: CoCo Desktop (Recommended - Mac or Windows)**
+
+Clone this repo, open the folder in CoCo Desktop, and say "deploy this to my account." CoCo reads the `COCO.md` file and walks you through each step interactively.
+
+**Option 2: Automated script (Mac/Linux)**
 
 ```bash
 git clone https://github.com/azbarbarian2020/Vehicle_Inspection_Pipeline.git
 cd Vehicle_Inspection_Pipeline
 ./setup.sh
 ```
+
+**Option 3: Manual step-by-step (Any platform)**
+
+See [DEPLOY.md](DEPLOY.md) for the full manual deployment guide with copy-paste SQL and Docker commands.
 
 The setup script will:
 1. Test your Snowflake CLI connection
