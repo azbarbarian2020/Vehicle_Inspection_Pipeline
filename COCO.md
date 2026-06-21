@@ -12,8 +12,42 @@ This is a Snowflake SPCS (Snowpark Container Services) application that automati
 
 When a user asks to deploy this to their Snowflake account, follow these steps in order. The user needs:
 - Docker Desktop running
-- A Snowflake CLI connection configured (check with `snow connection list`)
 - ACCOUNTADMIN role on the target account
+- Either a CoCo Desktop Snowflake connection OR a Snowflake CLI connection
+
+### Step 0: Verify Connectivity
+
+**If user has CoCo Desktop connected to their target account** (check the connection in the status bar):
+- Use `snowflake_sql_execute` for all SQL commands directly
+- You still need a CLI connection for Docker registry login
+
+**Check if a CLI connection exists:**
+```bash
+snow connection list
+```
+
+**If no CLI connection exists**, help the user set one up:
+1. Generate a key pair:
+   ```bash
+   mkdir -p ~/.snowflake/keys
+   openssl genrsa 2048 | openssl pkcs8 -topk8 -nocrypt -out ~/.snowflake/keys/<name>.p8
+   openssl rsa -in ~/.snowflake/keys/<name>.p8 -pubout -out /tmp/<name>_key.pub
+   ```
+2. Get the public key body: `grep -v 'BEGIN\|END' /tmp/<name>_key.pub | tr -d '\n'`
+3. Assign to user (run via CoCo's SQL or Snowsight):
+   ```sql
+   ALTER USER <username> SET RSA_PUBLIC_KEY='<public_key_body>';
+   ```
+4. Add to `~/.snowflake/connections.toml`:
+   ```toml
+   [<name>]
+   account = "<ORG-ACCOUNT>"
+   user = "<USERNAME>"
+   authenticator = "SNOWFLAKE_JWT"
+   private_key_file = "~/.snowflake/keys/<name>.p8"
+   role = "ACCOUNTADMIN"
+   ```
+5. Test: `snow connection test --connection <name>`
 
 ### Step 1: Identify the Connection
 
