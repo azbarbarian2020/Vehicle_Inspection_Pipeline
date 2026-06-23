@@ -10,6 +10,7 @@ import time
 import tempfile
 import asyncio
 import logging
+import threading
 from io import BytesIO
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -432,9 +433,11 @@ def send_inspection_email():
         conn.close()
 
 
-async def poll_queue():
-    """Background task: poll PROCESSING_QUEUE for new files."""
-    logger.info("Queue poller started")
+def poll_queue_loop():
+    """Background thread: poll PROCESSING_QUEUE for new files.
+    Runs in a separate thread so blocking Snowflake calls don't block the API event loop.
+    """
+    logger.info("Queue poller started (background thread)")
     # One-time catch-up for any unsent emails from before restart
     try:
         send_inspection_email()
@@ -495,15 +498,15 @@ async def poll_queue():
         except Exception as e:
             logger.error(f"Poller error: {e}")
 
-        await asyncio.sleep(POLL_INTERVAL)
+        time.sleep(POLL_INTERVAL)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start background poller on app startup."""
-    task = asyncio.create_task(poll_queue())
+    """Start background poller thread on app startup."""
+    poller_thread = threading.Thread(target=poll_queue_loop, daemon=True)
+    poller_thread.start()
     yield
-    task.cancel()
 
 
 # FastAPI app
